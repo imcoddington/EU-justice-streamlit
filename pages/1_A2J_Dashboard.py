@@ -21,7 +21,7 @@ from plotly.subplots import make_subplots
 
 # page configuration
 st.set_page_config(
-    page_title= "Access to Justice Journey",
+    page_title= "Justice Journey",
     page_icon = "📶",
 )
 
@@ -506,6 +506,14 @@ if passcheck.check_password():
             title_text="Distribution of Advisors",
             font_size=12,
             template="plotly_white"
+        )
+
+        fig3.update_layout(
+            font=dict(
+                size=11,  
+                color="black", 
+                family="Arial"
+            )
         )
 
         st.plotly_chart(fig3)
