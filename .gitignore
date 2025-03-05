@@ -1,0 +1,5 @@
+/inputs
+.streamlit/secrets.toml
+/tools/__pycache__
+/venv/Lib/site-packages/altair-5.5.0.dist-info
+/venv
