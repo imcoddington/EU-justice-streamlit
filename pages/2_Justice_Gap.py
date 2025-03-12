@@ -19,6 +19,7 @@ import dropbox.files
 from io import BytesIO
 from plotly.subplots import make_subplots
 import plotly.graph_objects as go
+import uuid 
 
 # page configuration
 st.set_page_config(
@@ -85,6 +86,7 @@ if passcheck.check_password():
     barrierstab, sociotab = st.tabs(["Distribution of Barriers", "Sociodemographic Effects"])
     with barrierstab:
 
+
         # User selects EU or specific countries
         country_selection = st.multiselect(
             "Please select countries (or all of EU) to compare: ",
@@ -92,7 +94,10 @@ if passcheck.check_password():
             default=["EU"]  # Start with the EU selected
         )
 
-        # Filter data based on user selection
+        ###########################################################
+        #                   TOTAL SAMPLE                          #
+        ###########################################################
+
         filtered_data = justice_score_summary[justice_score_summary['country_name_ltn'].isin(country_selection)]
 
         # Create a long-format DataFrame for easier plotting
@@ -101,7 +106,7 @@ if passcheck.check_password():
                                     var_name="Justice Gap Status",
                                     value_name="Percentage")
 
-        fig = px.bar(
+        fig_gap = px.bar(
             plot_data,
             x="Percentage",
             y="country_name_ltn",
@@ -112,20 +117,20 @@ if passcheck.check_password():
             text=plot_data["Percentage"].apply(lambda x: f"{x:.2f}%")
         )
 
-        fig.update_traces(
+        fig_gap.update_traces(
             hovertemplate="In <b>%{y}</b>, <b>%{x:.2f}%</b> of respondents who experienced a nontrivial <br>legal problem in the past two years were " +
                         "<b>%{customdata}</b>.<extra></extra>",
             customdata=plot_data["Justice Gap Status"].replace({"pct_in_gap": "in the justice gap", "pct_not_in_gap": "not in the justice gap"})
         )
 
         # Update layout to format text, remove legend, and hide y-axis label
-        fig.update_traces(
+        fig_gap.update_traces(
             textposition="inside",  
             insidetextanchor="middle",  
             textfont=dict(size=18, color="white")  
         )
 
-        fig.update_layout(
+        fig_gap.update_layout(
             showlegend=False,  
             yaxis_title="",  
             xaxis=dict(title="Percentage (%)"),  
@@ -133,117 +138,237 @@ if passcheck.check_password():
             plot_bgcolor="white"
         )
 
-        st.plotly_chart(fig)
+        st.plotly_chart(fig_gap)
 
 
-        selected_country = st.selectbox(
-            "Select a country to analyze barrier distribution:",
-            country_selection
+        demographics = st.selectbox(
+            "Would you like to view the distribution of legal barriers faced for the total sample, or for a specific demographic? ",
+            ['Total Sample', 'Disaggregated']
         )
+        if demographics == "Disaggregated":
+            demo = st.selectbox(
+                    "Choose a disagreggation: ",
+                    ['Gender', 'Income', 'Both']
+                )
 
-        country_data = justice_score_summary[justice_score_summary["country_name_ltn"] == selected_country].iloc[0]
-        barrier_data = pd.DataFrame({
-            "Barrier Type": ["No Barriers","1 Barrier", "2 Barriers", "3 Barriers", "4 Barriers"],
-            "Percentage": [
-                country_data["pct_0_barriers"],
-                country_data["pct_1_barrier"], 
-                country_data["pct_2_barrier"], 
-                country_data["pct_3_barriers"], 
-                country_data["pct_4_barriers"]
-            ]
-        })
+            if demo == "Gender":
+                data = pd.read_csv('inputs/justice_gap_gend.csv')
+                dem_groups = ["Male", "Female"]
 
-        fig_barrier     = px.bar(
-            barrier_data,
-            x="Barrier Type",
-            y="Percentage",
-            title=f"Barrier Distribution in {selected_country}",
-            labels={"Percentage": "Percentage (%)", "Barrier Type": "Number of Barriers Faced"},
-            color="Barrier Type"  
-        )
-        fig_barrier.update_traces(
-            hovertemplate = "<b>%{y:.2f}%</b> of respondents experienced %{x}. "
-        )
-        fig_barrier.update_layout(
-            showlegend = False
-        )
+            if demo == "Income":
+                data = pd.read_csv('inputs/justice_gap_es.csv')
+                dem_groups = [0,1]
 
-        st.plotly_chart(fig_barrier)
+            if demo == "Both":
+                data = pd.read_csv('inputs/dem_breakdowns_justice_gap.csv')
+                data['combined_group'] = data['gender'] + ', ' + data['fintight'].astype("string")
+                dem_groups = ['Female, 0', 'Female, 1', 'Male, 0', 'Male, 1']
 
 
-        share_of_barriers = pd.DataFrame({
-            "Number of Barriers Faced" : [1, 2, 3],
-            "Solution" : [
-                country_data['pct_solution_barrier_barrier_1'],
-                country_data['pct_solution_barrier_barrier_2'],
-                country_data['pct_solution_barrier_barrier_3']
-            ],
-            "Information" : [
-                country_data['pct_info_barrier_barrier_1'],
-                country_data['pct_info_barrier_barrier_2'],
-                country_data['pct_info_barrier_barrier_3']
-            ],
-            "Delays, Fairness, Cost" : [
-                country_data['pct_dcf_barrier_barrier_1'],
-                country_data['pct_dcf_barrier_barrier_2'],
-                country_data['pct_dcf_barrier_barrier_3']
-            ],
-            "Representation" : [
-                country_data['pct_representation_barrier_barrier_1'],
-                country_data['pct_representation_barrier_barrier_2'],
-                country_data['pct_representation_barrier_barrier_3']
-            ]
-        })
 
-# Barrier Types for Labels
-        barrier_labels = ["Solution Barrier", "Delays, Cost or Fairness Barrier", "Information Barrier", "Representation Barrier"]
-        barrier_count_labels = ["Experienced 1 Barrier", "Experienced 2 Barriers", "Experienced 3 Barriers"]
+            selected_country = st.selectbox(
+                    "Select a country to analyze barrier distribution (disaggregated): ",
+                    country_selection
+                )
 
-        # Create subplot layout with 1 row and 3 columns
-        fig = make_subplots(
-            rows=1, cols=3, 
-            specs=[[{"type": "domain"}, {"type": "domain"}, {"type": "domain"}]]  # Each subplot is a pie chart
-        )
-        custom_colors = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728"]  # Blue, Orange, Green, Red
+            subset = data[data['country_name_ltn'] == selected_country]
+
+            if subset.empty:
+                st.warning(f"No data available for {selected_country}.")
+            else:
+                if demo == "Gender":
+                    subset['group_label'] = subset['gender']
+                elif demo == "Income":
+                    subset['group_label'] = subset['fintight'].map({1: "Low ES", 0: "High ES"})
+                elif demo == "Both":
+                    subset['group_label'] = subset['gender'] + " - " + subset['fintight'].map({1: "Low ES", 0: "High ES"})
+                
+
+            barrier_melted = subset.melt(id_vars=['group_label'],
+                                  value_vars=['pct_0_barriers', 'pct_1_barrier', 'pct_2_barrier', 'pct_3_barriers', 'pct_4_barriers'],
+                                  var_name='Barrier Type',
+                                  value_name='Percentage')
+            barrier_melted['Barrier Type'] = barrier_melted['Barrier Type'].replace({
+                'pct_0_barriers': 'No Barriers',
+                'pct_1_barriers': '1 Barrier',
+                'pct_2_barriers': '2 Barriers',
+                'pct_3_barriers': '3 Barriers',
+                'pct_4_barriers': '4 Barriers'
+            })
+
+            fig_barrier = px.bar(
+                barrier_melted,
+                x='Barrier Type',
+                y='Percentage',
+                color='group_label',
+                barmode='stack',
+                title=f"Stacked Barrier Distribution by {demo} in {selected_country}",
+                labels={'Percentage': 'Percentage (%)', 'Barrier Type': 'Number of Barriers Faced', 'group_label': 'Demographic Group'}
+            )
+            fig_barrier.update_traces(hovertemplate="<b>%{y:.2f}%</b> experienced %{x}.")
+            st.plotly_chart(fig_barrier, key=f"bar_chart_{selected_country}_{uuid.uuid4()}")
+
+            group_labels = subset['group_label'].unique()
 
 
-        # Add Pie Charts for Each Barrier Count
-        for i, row in share_of_barriers.iterrows():
-            fig.add_trace(
-                go.Pie(
-                    labels=barrier_labels,
-                    values=row[1:],  
-                    hole=0.4,  
-                    marker=dict(colors=custom_colors),  
-                    hovertemplate="<b>%{label}</b>: <b>%{value:.2f}%</b><extra></extra>"
+            # pie charts
+            num_groups = len(group_labels)
+            rows, cols = (1, 2) if num_groups == 2 else (2, 2)
+            
+            fig_pie = make_subplots(rows=rows, subplot_titles=subset['group_label'].values,cols=cols, specs=[[{"type": "domain"} for _ in range(cols)] for _ in range(rows)])
+            
+            row_idx, col_idx = 1, 1
+            for group in group_labels:
+                group_data = subset[subset['group_label'] == group]
+                
+                share_of_barriers = group_data.melt(id_vars=['group_label'],
+                                                    value_vars=['pct_solution_barrier_barrier_1', 'pct_solution_barrier_barrier_2', 'pct_solution_barrier_barrier_3',
+                                                                'pct_info_barrier_barrier_1', 'pct_info_barrier_barrier_2', 'pct_info_barrier_barrier_3',
+                                                                'pct_dcf_barrier_barrier_1', 'pct_dcf_barrier_barrier_2', 'pct_dcf_barrier_barrier_3',
+                                                                'pct_representation_barrier_barrier_1', 'pct_representation_barrier_barrier_2', 'pct_representation_barrier_barrier_3'],
+                                                    var_name='Barrier Type',
+                                                    value_name='Percentage')
+                
+                share_of_barriers['Barrier Type'] = share_of_barriers['Barrier Type'].replace({
+                    'pct_solution_barrier_barrier_1': 'Solution', 'pct_solution_barrier_barrier_2': 'Solution', 'pct_solution_barrier_barrier_3': 'Solution',
+                    'pct_info_barrier_barrier_1': 'Information', 'pct_info_barrier_barrier_2': 'Information', 'pct_info_barrier_barrier_3': 'Information',
+                    'pct_dcf_barrier_barrier_1': 'Delays, Fairness, Cost', 'pct_dcf_barrier_barrier_2': 'Delays, Fairness, Cost', 'pct_dcf_barrier_barrier_3': 'Delays, Fairness, Cost',
+                    'pct_representation_barrier_barrier_1': 'Representation', 'pct_representation_barrier_barrier_2': 'Representation', 'pct_representation_barrier_barrier_3': 'Representation'
+                })
+                
+                fig_pie.add_trace(
+                    go.Pie(
+                        labels=share_of_barriers['Barrier Type'],
+                        values=share_of_barriers['Percentage'],
+                        name=group,
+                        hole=0.4
+                    ),
+                    row=row_idx, col=col_idx
+                )
+                
+                col_idx += 1
+                if col_idx > cols:
+                    col_idx = 1
+                    row_idx += 1
+            
+            fig_pie.update_layout(title_text=f"Barrier Types by {demo} in {selected_country}", showlegend=True)
+            st.plotly_chart(fig_pie, key=f"pie_chart_{selected_country}_{uuid.uuid4()}")
 
-                ),
-                row=1, col=i+1  
+                                
+        if demographics == "Total Sample":
+            selected_country = st.selectbox(
+                "Select a country to analyze barrier distribution:",
+                country_selection
+            )
+            country_data = filtered_data[
+                filtered_data["country_name_ltn"] == selected_country
+                ]
+            
+            barrier_data = pd.DataFrame({
+                "Barrier Type": ["No Barriers","1 Barrier", "2 Barriers", "3 Barriers", "4 Barriers"],
+                "Percentage": [
+                    country_data["pct_0_barriers"].values[0],
+                    country_data["pct_1_barrier"].values[0], 
+                    country_data["pct_2_barrier"].values[0], 
+                    country_data["pct_3_barriers"].values[0], 
+                    country_data["pct_4_barriers"].values[0]
+                ]
+            })
+
+
+            fig_b  = px.bar(
+                barrier_data,
+                x="Barrier Type",
+                y="Percentage",
+                title=f"Barrier Distribution in {selected_country} ",
+                labels={"Percentage": "Percentage (%)", "Barrier Type": "Number of Barriers Faced"},
+                color="Barrier Type"  
+            )
+            fig_b.update_traces(
+                hovertemplate = "<b>%{y:.2f}%</b> of respondents experienced %{x}. "
+            )
+            fig_b.update_layout(
+                showlegend = False,
+                yaxis = dict(range = [0,100])
             )
 
-        for i, label in enumerate(barrier_count_labels):
-            fig.add_annotation(
-                text=f"<b>{label}</b>",  
-                x=i / 2,  
-                y=-0.1,  
-                showarrow=False,
-                font=dict(size=14)
+            st.plotly_chart(fig_b)
+
+
+            share_of_barriers = pd.DataFrame({
+                "Number of Barriers Faced" : [1, 2, 3],
+                "Solution" : [
+                    country_data['pct_solution_barrier_barrier_1'].values[0],
+                    country_data['pct_solution_barrier_barrier_2'].values[0],
+                    country_data['pct_solution_barrier_barrier_3'].values[0]
+                ],
+                "Information" : [
+                    country_data['pct_info_barrier_barrier_1'].values[0],
+                    country_data['pct_info_barrier_barrier_2'].values[0],
+                    country_data['pct_info_barrier_barrier_3'].values[0]
+                ],
+                "Delays, Fairness, Cost" : [
+                    country_data['pct_dcf_barrier_barrier_1'].values[0],
+                    country_data['pct_dcf_barrier_barrier_2'].values[0],
+                    country_data['pct_dcf_barrier_barrier_3'].values[0]
+                ],
+                "Representation" : [
+                    country_data['pct_representation_barrier_barrier_1'].values[0],
+                    country_data['pct_representation_barrier_barrier_2'].values[0],
+                    country_data['pct_representation_barrier_barrier_3'].values[0]
+                ]
+            })
+
+            # Barrier Types for Labels
+            barrier_labels = ["Solution Barrier", "Delays, Cost or Fairness Barrier", "Information Barrier", "Representation Barrier"]
+            barrier_count_labels = ["Experienced 1 Barrier", "Experienced 2 Barriers", "Experienced 3 Barriers"]
+
+            # Create subplot layout with 1 row and 3 columns
+            fig = make_subplots(
+                rows=1, cols=3, 
+                specs=[[{"type": "domain"}, {"type": "domain"}, {"type": "domain"}]]  # Each subplot is a pie chart
+            )
+            custom_colors = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728"]  # Blue, Orange, Green, Red
+
+
+            # Add Pie Charts for Each Barrier Count
+            for i, row in share_of_barriers.iterrows():
+                fig.add_trace(
+                    go.Pie(
+                        labels=barrier_labels,
+                        values=row[1:],  
+                        hole=0.4,  
+                        marker=dict(colors=custom_colors),  
+                        hovertemplate="<b>%{label}</b>: <b>%{value:.2f}%</b><extra></extra>"
+
+                    ),
+                    row=1, col=i+1  
+                )
+
+            for i, label in enumerate(barrier_count_labels):
+                fig.add_annotation(
+                    text=f"<b>{label}</b>",  
+                    x=i / 2,  
+                    y=-0.1,  
+                    showarrow=False,
+                    font=dict(size=14)
+                )
+
+            # Format layout
+            fig.update_layout(
+                title_text=f"Distribution of Barrier Types by Barrier Count in {selected_country}",
+                showlegend=True,
+                legend=dict(
+                    orientation="h",  
+                    yanchor="bottom",  
+                    y=1.05,  
+                    xanchor="center",  
+                    x=0.5  
+                )  
             )
 
-        # Format layout
-        fig.update_layout(
-            title_text=f"Distribution of Barrier Types by Barrier Count in {selected_country}",
-            showlegend=True,
-            legend=dict(
-                orientation="h",  
-                yanchor="bottom",  
-                y=1.05,  
-                xanchor="center",  
-                x=0.5  
-            )  
-        )
+            st.plotly_chart(fig)
 
-        st.plotly_chart(fig)
 
 
     with sociotab:
