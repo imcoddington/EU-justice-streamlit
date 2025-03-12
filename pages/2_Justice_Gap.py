@@ -152,15 +152,15 @@ if passcheck.check_password():
                 )
 
             if demo == "Gender":
-                data = pd.read_csv('inputs/justice_gap_gend.csv')
+                data = pd.read_csv('.streamlit/inputs/justice_gap_gend.csv')
                 dem_groups = ["Male", "Female"]
 
             if demo == "Income":
-                data = pd.read_csv('inputs/justice_gap_es.csv')
+                data = pd.read_csv('.streamlit/inputs/justice_gap_es.csv')
                 dem_groups = [0,1]
 
             if demo == "Both":
-                data = pd.read_csv('inputs/dem_breakdowns_justice_gap.csv')
+                data = pd.read_csv('.streamlit/inputs/dem_breakdowns_justice_gap.csv')
                 data['combined_group'] = data['gender'] + ', ' + data['fintight'].astype("string")
                 dem_groups = ['Female, 0', 'Female, 1', 'Male, 0', 'Male, 1']
 
