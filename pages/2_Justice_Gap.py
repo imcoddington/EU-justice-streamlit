@@ -152,15 +152,18 @@ if passcheck.check_password():
                 )
 
             if demo == "Gender":
-                data = pd.read_csv('.streamlit/inputs/justice_gap_gend.csv')
+                data = load_DBfile("justice_gap_gend.csv", format = 'csv')
+                # data = pd.read_csv('.streamlit/inputs/justice_gap_gend.csv')
                 dem_groups = ["Male", "Female"]
 
             if demo == "Income":
-                data = pd.read_csv('.streamlit/inputs/justice_gap_es.csv')
+                data = load_DBfile('justice_gap_es.csv', format = 'csv')
+                # data = pd.read_csv('.streamlit/inputs/justice_gap_es.csv')
                 dem_groups = [0,1]
 
             if demo == "Both":
-                data = pd.read_csv('.streamlit/inputs/dem_breakdowns_justice_gap.csv')
+                data = load_DBfile('dem_breakdowns_justice_gap.csv', format = 'csv')
+                # data = pd.read_csv('.streamlit/inputs/dem_breakdowns_justice_gap.csv')
                 data['combined_group'] = data['gender'] + ', ' + data['fintight'].astype("string")
                 dem_groups = ['Female, 0', 'Female, 1', 'Male, 0', 'Male, 1']
 
@@ -190,8 +193,8 @@ if passcheck.check_password():
                                   value_name='Percentage')
             barrier_melted['Barrier Type'] = barrier_melted['Barrier Type'].replace({
                 'pct_0_barriers': 'No Barriers',
-                'pct_1_barriers': '1 Barrier',
-                'pct_2_barriers': '2 Barriers',
+                'pct_1_barrier': '1 Barrier',
+                'pct_2_barrier': '2 Barriers',
                 'pct_3_barriers': '3 Barriers',
                 'pct_4_barriers': '4 Barriers'
             })
